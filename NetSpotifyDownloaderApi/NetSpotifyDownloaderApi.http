@@ -1,0 +1,6 @@
+@NetSpotifyDownloaderApi_HostAddress = http://localhost:5042
+
+GET {{NetSpotifyDownloaderApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
