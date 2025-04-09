@@ -102,7 +102,10 @@ namespace NetSpotifyDownloaderCore.Repositories.Implementation
                     {
                         Id = p.id,
                         Name = p.name,
-                        Uri = new Uri(p.external_urls.spotify)
+                        Uri = new Uri(p.external_urls.spotify),
+                        Owner = p.owner.display_name,
+                        TracksCount = p.tracks.total,
+                        Thumbnail = p.images.Any() ? new(p.images.FirstOrDefault().url) : new Uri("https://openverse.org/_nuxt/image_not_available_placeholder.BTm11Bgh.png")
                     }).ToList();
             }
             catch (HttpRequestException ex)
