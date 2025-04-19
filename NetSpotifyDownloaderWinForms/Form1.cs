@@ -1,5 +1,7 @@
 ﻿using NetSpotifyDownloaderCore.Services;
 using System;
+using System.Diagnostics;
+using System.Linq;
 using System.Net;
 using System.Windows.Forms;
 
@@ -8,11 +10,17 @@ namespace NetSpotifyDownloaderWinForms
     public partial class Form1 : Form
     {
         private readonly SpotifyService _spotifyService;
+        private readonly YoutubeMusicService _youtubeMusicService;
+        private readonly YoutubeDownloaderService _youtubeDownloaderService;
         private readonly HttpClient _httpClient;
         private FlowLayoutPanel flowPanel;
-        public Form1(SpotifyService spotifyService, HttpClient httpClient)
+
+        private string tempRootPath = @"D:\test spoti";
+        public Form1(SpotifyService spotifyService, YoutubeMusicService youtubeMusicService, YoutubeDownloaderService youtubeDownloaderService, HttpClient httpClient)
         {
             _spotifyService = spotifyService;
+            _youtubeMusicService = youtubeMusicService;
+            _youtubeDownloaderService = youtubeDownloaderService;
 
             InitializeComponent();
 
@@ -122,6 +130,74 @@ namespace NetSpotifyDownloaderWinForms
 
             tabControl.TabPages.Add(playlistsTab);
             this.Controls.Add(tabControl);
+        }
+
+        private async Task DownloadPlaylistAsync(string playlistId, string title)
+        {
+            try
+            {
+                var tracks = await _spotifyService.GetTracksByPlaylistAsync(playlistId);
+
+                foreach (var track in tracks)
+                {
+                    var youtubeTrack = await _youtubeMusicService.SearchTrackAsync(track.Title, string.Join(", ", track.Artists));
+                    if (youtubeTrack == null)
+                    {
+                        continue;
+                    }
+
+                    var youtubeDownload = await _youtubeDownloaderService.GetMp3DownloadUrlAsync(youtubeTrack.Uri.ToString());
+                    if (youtubeDownload == null)
+                    {
+                        continue;
+                    }
+                    var downloadUrl = youtubeDownload.Uri.ToString();
+                    var fileName = $"{string.Join(", ", track.Artists)} - {track.Title}.mp3".Replace(",  -", " -");
+                    var filePath = Path.Combine(tempRootPath, title, fileName);
+                    Directory.CreateDirectory(Path.GetDirectoryName(filePath) ?? string.Empty);
+                    using (var webClient = new WebClient())
+                    {
+                        var tempFilePath = Path.Combine(tempRootPath, title, $"{Guid.NewGuid()}.weba");
+                        Directory.CreateDirectory(Path.GetDirectoryName(tempFilePath) ?? string.Empty);
+
+                        await webClient.DownloadFileTaskAsync(new Uri(downloadUrl), tempFilePath);
+
+                         var mp3FilePath = Path.Combine(tempRootPath, title, fileName);
+
+                        // Convert to MP3 using ffmpeg
+                        var ffmpeg = new ProcessStartInfo
+                        {
+                            FileName = "ffmpeg",
+                            Arguments = $"-y -i \"{tempFilePath}\" -vn -ab 192k -ar 44100 -f mp3 \"{mp3FilePath}\"",
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            CreateNoWindow = true
+                        };
+
+                        using (var process = Process.Start(ffmpeg))
+                        {
+                            if (process == null)
+                                throw new InvalidOperationException("Failed to start ffmpeg process");
+
+                            string output = await process.StandardOutput.ReadToEndAsync();
+                            string error = await process.StandardError.ReadToEndAsync();
+
+                            await process.WaitForExitAsync();
+
+                            if (process.ExitCode != 0)
+                                throw new Exception($"ffmpeg error: {error}");
+                        }
+
+                        // Optionally delete the original file
+                        File.Delete(tempFilePath);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error cargando canciones: " + ex.Message);
+            }
         }
 
         private async Task LoadPlaylistsAsync(FlowLayoutPanel flowPanel)
@@ -257,6 +333,24 @@ namespace NetSpotifyDownloaderWinForms
                         await LoadPlaylistsAsync(flowPanel);
                     };
                     flowPanel.Controls.Add(backButton);
+
+                    var downloadButton = new Button
+                    {
+                        Text = "Download playlist",
+                        ForeColor = Color.White,
+                        FlatStyle = FlatStyle.Flat,
+                        BackColor = Color.FromArgb(50, 50, 70),
+                        Height = 40,
+                        Width = 200,
+                        Margin = new Padding(10),
+                    };
+                    downloadButton.FlatAppearance.BorderSize = 0;
+                    downloadButton.Click += async (_, _) =>
+                    {
+                        flowPanel.Controls.Clear();
+                        _ = DownloadPlaylistAsync(playlistId, title);
+                    };
+                    flowPanel.Controls.Add(downloadButton);
 
                     // Título de la playlist
                     var header = new Label
