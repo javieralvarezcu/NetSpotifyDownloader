@@ -52,6 +52,7 @@ namespace NetSpotifyDownloaderCore.Repositories.Implementation
                         Id = i.track.id,
                         Title = i.track.name,
                         Artists = i.track.artists?.Select(a => a.name).ToArray() ?? Array.Empty<string>(),
+                        Year = i.track.album?.release_date != null ? DateTime.Parse(i.track.album.release_date).Year : 0,
                         AlbumName = i.track.album?.name ?? "Desconocido",
                         AlbumImageUri = GetBestImageUri(i.track.album?.images)
                     })

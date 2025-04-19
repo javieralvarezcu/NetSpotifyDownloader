@@ -1,9 +1,11 @@
-﻿using NetSpotifyDownloaderCore.Services;
+﻿using NetSpotifyDownloaderCore.Model.Spotify.DTOs;
+using NetSpotifyDownloaderCore.Services;
 using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Windows.Forms;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.StartPanel;
 
 namespace NetSpotifyDownloaderWinForms
 {
@@ -14,6 +16,7 @@ namespace NetSpotifyDownloaderWinForms
         private readonly YoutubeDownloaderService _youtubeDownloaderService;
         private readonly HttpClient _httpClient;
         private FlowLayoutPanel flowPanel;
+        private List<SpotifyPlaylistDTO> _playlists = new();
 
         private string tempRootPath = @"D:\test spoti";
         public Form1(SpotifyService spotifyService, YoutubeMusicService youtubeMusicService, YoutubeDownloaderService youtubeDownloaderService, HttpClient httpClient)
@@ -97,6 +100,23 @@ namespace NetSpotifyDownloaderWinForms
             };
             this.Controls.Add(title);
 
+            var downloadAllButton = new Button
+            {
+                Text = "Download all playlists",
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(50, 50, 70),
+                Height = 40,
+                Width = 200,
+                Margin = new Padding(10),
+            };
+            downloadAllButton.FlatAppearance.BorderSize = 0;
+            downloadAllButton.Click += async (_, _) =>
+            {
+                _ = DownloadPlaylistsAsync(_playlists);
+            };
+            this.Controls.Add(downloadAllButton);
+
             // Tabs: Playlists, Albums, etc.
             var tabControl = new TabControl
             {
@@ -132,14 +152,25 @@ namespace NetSpotifyDownloaderWinForms
             this.Controls.Add(tabControl);
         }
 
-        private async Task DownloadPlaylistAsync(string playlistId, string title)
+        private async Task DownloadPlaylistsAsync(List<SpotifyPlaylistDTO> playlists)
         {
+            foreach (var playlist in playlists)
+            {
+                _ = DownloadPlaylistAsync(playlist);
+                Thread.Sleep(5000);
+            }
+        }
+
+        private async Task DownloadPlaylistAsync(SpotifyPlaylistDTO playlist)
+        {
+            string currentTrack = string.Empty;
             try
             {
-                var tracks = await _spotifyService.GetTracksByPlaylistAsync(playlistId);
+                List<SpotifyTrackDTO> tracks = await _spotifyService.GetTracksByPlaylistAsync(playlist.Id);
 
                 foreach (var track in tracks)
                 {
+                    currentTrack = $"{string.Join(", ", track.Artists)} - {track.Title}";
                     var youtubeTrack = await _youtubeMusicService.SearchTrackAsync(track.Title, string.Join(", ", track.Artists));
                     if (youtubeTrack == null)
                     {
@@ -153,16 +184,15 @@ namespace NetSpotifyDownloaderWinForms
                     }
                     var downloadUrl = youtubeDownload.Uri.ToString();
                     var fileName = $"{string.Join(", ", track.Artists)} - {track.Title}.mp3".Replace(",  -", " -");
-                    var filePath = Path.Combine(tempRootPath, title, fileName);
+                    var filePath = Path.Combine(tempRootPath, playlist.Name, fileName);
                     Directory.CreateDirectory(Path.GetDirectoryName(filePath) ?? string.Empty);
                     using (var webClient = new WebClient())
                     {
-                        var tempFilePath = Path.Combine(tempRootPath, title, $"{Guid.NewGuid()}.weba");
+                        var tempFilePath = Path.Combine(tempRootPath, playlist.Name, $"{Guid.NewGuid()}.weba");
                         Directory.CreateDirectory(Path.GetDirectoryName(tempFilePath) ?? string.Empty);
-
                         await webClient.DownloadFileTaskAsync(new Uri(downloadUrl), tempFilePath);
 
-                         var mp3FilePath = Path.Combine(tempRootPath, title, fileName);
+                        var mp3FilePath = Path.Combine(tempRootPath, playlist.Name, fileName);
 
                         // Convert to MP3 using ffmpeg
                         var ffmpeg = new ProcessStartInfo
@@ -189,6 +219,32 @@ namespace NetSpotifyDownloaderWinForms
                                 throw new Exception($"ffmpeg error: {error}");
                         }
 
+                        using (var fs = new FileStream(mp3FilePath, FileMode.Open, FileAccess.ReadWrite))
+                        {
+                            var tagFile = TagLib.File.Create(new TagLib.StreamFileAbstraction(Path.GetFileName(mp3FilePath), fs, fs));
+
+                            tagFile.Tag.Title = track.Title;
+                            tagFile.Tag.Performers = track.Artists;
+                            tagFile.Tag.AlbumArtists = track.Artists;
+                            tagFile.Tag.Album = track.AlbumName;
+                            tagFile.Tag.Year = Convert.ToUInt32(track.Year);
+
+                            if (track.AlbumImageUri != null)
+                            {
+                                using var http = new HttpClient();
+                                var imageBytes = await http.GetByteArrayAsync(track.AlbumImageUri);
+                                var picture = new TagLib.Picture(new TagLib.ByteVector(imageBytes))
+                                {
+                                    Type = TagLib.PictureType.FrontCover,
+                                    Description = "Cover",
+                                    MimeType = "image/jpeg"
+                                };
+                                tagFile.Tag.Pictures = new TagLib.IPicture[] { picture };
+                            }
+
+                            tagFile.Save();
+                        }
+
                         // Optionally delete the original file
                         File.Delete(tempFilePath);
                     }
@@ -196,35 +252,23 @@ namespace NetSpotifyDownloaderWinForms
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error cargando canciones: " + ex.Message);
+                MessageBox.Show("Error cargando canciones: " + currentTrack + "\n"+ ex.Message);
             }
         }
 
         private async Task LoadPlaylistsAsync(FlowLayoutPanel flowPanel)
         {
-            // Mostrar placeholders mientras carga
-            for (int i = 0; i < 8; i++)
-            {
-                var card = await CreatePlaylistCard("Cargando...", "by ...", "...");
-                flowPanel.Controls.Add(card);
-            }
-
             try
             {
-                var playlists = await _spotifyService.GetUserPlaylistsAsync("thejavieralcu99");
+                List<SpotifyPlaylistDTO> playlists = await _spotifyService.GetUserPlaylistsAsync("thejavieralcu99");
+                _playlists = playlists;
 
                 // Reemplazar placeholders
                 flowPanel.Controls.Clear();
 
                 foreach (var playlist in playlists)
                 {
-                    var card = await CreatePlaylistCard(
-                        playlist.Name,
-                        $"by {playlist.Owner}",
-                        $"{playlist.TracksCount} tracks",
-                        playlist.Thumbnail,
-                        playlist.Id
-                    );
+                    var card = await CreatePlaylistCard(playlist);
 
                     flowPanel.Controls.Add(card);
 
@@ -238,8 +282,13 @@ namespace NetSpotifyDownloaderWinForms
             }
         }
 
-        private async Task<Control> CreatePlaylistCard(string title, string author, string tracks, Uri? thumbnailUri = null, string? playlistId = null)
+        private async Task<Control> CreatePlaylistCard(SpotifyPlaylistDTO playlist)
         {
+            //playlist.Name,
+            //$"by {playlist.Owner}",
+            //            $"{playlist.TracksCount} tracks",
+            //            playlist.Thumbnail,
+            //            playlist.Id
             var panel = new Panel
             {
                 Width = 180,
@@ -258,12 +307,12 @@ namespace NetSpotifyDownloaderWinForms
                 SizeMode = PictureBoxSizeMode.StretchImage
             };
 
-            if (thumbnailUri != null)
+            if (playlist.Thumbnail != null)
             {
                 try
                 {
                     using var httpClient = new HttpClient();
-                    var imageBytes = await httpClient.GetByteArrayAsync(thumbnailUri);
+                    var imageBytes = await httpClient.GetByteArrayAsync(playlist.Thumbnail);
                     using var ms = new MemoryStream(imageBytes);
                     pic.Image = Image.FromStream(ms);
                 }
@@ -275,7 +324,7 @@ namespace NetSpotifyDownloaderWinForms
 
             var titleLabel = new Label
             {
-                Text = title,
+                Text = playlist.Name,
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
                 Dock = DockStyle.Top,
@@ -285,7 +334,7 @@ namespace NetSpotifyDownloaderWinForms
 
             var authorLabel = new Label
             {
-                Text = author,
+                Text = playlist.Owner,
                 ForeColor = Color.LightGray,
                 Font = new Font("Segoe UI", 9),
                 Dock = DockStyle.Top,
@@ -295,7 +344,7 @@ namespace NetSpotifyDownloaderWinForms
 
             var trackLabel = new Label
             {
-                Text = tracks,
+                Text = $"{playlist.TracksCount} tracks",
                 ForeColor = Color.Gray,
                 Font = new Font("Segoe UI", 8),
                 Dock = DockStyle.Top,
@@ -310,7 +359,7 @@ namespace NetSpotifyDownloaderWinForms
 
             void PanelClickHandler(object? sender, EventArgs e)
             {
-                if (playlistId != null)
+                if (playlist != null)
                 {
                     // Limpiar vista actual
                     flowPanel.Controls.Clear();
@@ -347,15 +396,14 @@ namespace NetSpotifyDownloaderWinForms
                     downloadButton.FlatAppearance.BorderSize = 0;
                     downloadButton.Click += async (_, _) =>
                     {
-                        flowPanel.Controls.Clear();
-                        _ = DownloadPlaylistAsync(playlistId, title);
+                        _ = DownloadPlaylistsAsync(new() { playlist });
                     };
                     flowPanel.Controls.Add(downloadButton);
 
                     // Título de la playlist
                     var header = new Label
                     {
-                        Text = title,
+                        Text = playlist.Name,
                         Font = new Font("Segoe UI", 16, FontStyle.Bold),
                         ForeColor = Color.White,
                         Height = 50,
@@ -364,7 +412,7 @@ namespace NetSpotifyDownloaderWinForms
                     };
                     flowPanel.Controls.Add(header);
 
-                    _ = LoadPlaylistTracksAsync(playlistId);
+                    _ = LoadPlaylistTracksAsync(playlist.Id);
                 }
             }
 
