@@ -146,7 +146,8 @@ namespace NetSpotifyDownloaderWinForms
                         playlist.Name,
                         $"by {playlist.Owner}",
                         $"{playlist.TracksCount} tracks",
-                        playlist.Thumbnail
+                        playlist.Thumbnail,
+                        playlist.Id
                     );
 
                     flowPanel.Controls.Add(card);
@@ -161,23 +162,23 @@ namespace NetSpotifyDownloaderWinForms
             }
         }
 
-        private async Task<Control> CreatePlaylistCard(string title, string author, string tracks, Uri? thumbnailUri = null)
+        private async Task<Control> CreatePlaylistCard(string title, string author, string tracks, Uri? thumbnailUri = null, string? playlistId = null)
         {
             var panel = new Panel
             {
                 Width = 180,
                 Height = 200,
                 Margin = new Padding(10),
-                BackColor = Color.FromArgb(30, 30, 40)
+                BackColor = Color.FromArgb(30, 30, 40),
+                Cursor = Cursors.Hand
             };
 
-            
             var pic = new PictureBox
             {
                 Width = 180,
                 Height = 120,
                 Dock = DockStyle.Top,
-                BackColor = Color.Gray, // simulando portada
+                BackColor = Color.Gray,
                 SizeMode = PictureBoxSizeMode.StretchImage
             };
 
@@ -230,6 +231,21 @@ namespace NetSpotifyDownloaderWinForms
             panel.Controls.Add(authorLabel);
             panel.Controls.Add(titleLabel);
             panel.Controls.Add(pic);
+
+            void PanelClickHandler(object? sender, EventArgs e)
+            {
+                if (playlistId != null)
+                {
+                    var detailsForm = new PlaylistDetailsForm(_spotifyService, playlistId, title);
+                    detailsForm.Show();
+                }
+            }
+
+            panel.Click += PanelClickHandler;
+            pic.Click += PanelClickHandler;
+            titleLabel.Click += PanelClickHandler;
+            authorLabel.Click += PanelClickHandler;
+            trackLabel.Click += PanelClickHandler;
 
             return panel;
         }
