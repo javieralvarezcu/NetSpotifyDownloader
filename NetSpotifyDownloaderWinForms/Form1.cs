@@ -1,4 +1,4 @@
-using NetSpotifyDownloaderCore.Services;
+﻿using NetSpotifyDownloaderCore.Services;
 using System;
 using System.Net;
 using System.Windows.Forms;
@@ -18,7 +18,7 @@ namespace NetSpotifyDownloaderWinForms
 
             InitUI();
 
-            // Ejecutamos la carga de playlists en segundo plano una vez todo est� montado
+            // Ejecutamos la carga de playlists en segundo plano una vez todo está montado
             this.Shown += async (_, _) => await LoadPlaylistsAsync(flowPanel);
             _httpClient = httpClient;
         }
@@ -62,7 +62,7 @@ namespace NetSpotifyDownloaderWinForms
                 topOffset += 45;
             }
 
-            // Barra de b�squeda
+            // Barra de búsqueda
             var searchBox = new TextBox
             {
                 PlaceholderText = "Search anything you want (or just paste a link)",
@@ -236,8 +236,41 @@ namespace NetSpotifyDownloaderWinForms
             {
                 if (playlistId != null)
                 {
-                    var detailsForm = new PlaylistDetailsForm(_spotifyService, playlistId, title);
-                    detailsForm.Show();
+                    // Limpiar vista actual
+                    flowPanel.Controls.Clear();
+
+                    // Botón de volver
+                    var backButton = new Button
+                    {
+                        Text = "⬅ Back to playlists",
+                        ForeColor = Color.White,
+                        FlatStyle = FlatStyle.Flat,
+                        BackColor = Color.FromArgb(50, 50, 70),
+                        Height = 40,
+                        Width = 200,
+                        Margin = new Padding(10),
+                    };
+                    backButton.FlatAppearance.BorderSize = 0;
+                    backButton.Click += async (_, _) =>
+                    {
+                        flowPanel.Controls.Clear();
+                        await LoadPlaylistsAsync(flowPanel);
+                    };
+                    flowPanel.Controls.Add(backButton);
+
+                    // Título de la playlist
+                    var header = new Label
+                    {
+                        Text = title,
+                        Font = new Font("Segoe UI", 16, FontStyle.Bold),
+                        ForeColor = Color.White,
+                        Height = 50,
+                        Width = flowPanel.Width - 40,
+                        Padding = new Padding(10),
+                    };
+                    flowPanel.Controls.Add(header);
+
+                    _ = LoadPlaylistTracksAsync(playlistId);
                 }
             }
 
@@ -248,6 +281,41 @@ namespace NetSpotifyDownloaderWinForms
             trackLabel.Click += PanelClickHandler;
 
             return panel;
+        }
+
+        private async Task LoadPlaylistTracksAsync(string playlistId)
+        {
+            try
+            {
+                var tracks = await _spotifyService.GetTracksByPlaylistAsync(playlistId);
+
+                foreach (var track in tracks)
+                {
+                    var row = new Panel
+                    {
+                        Width = flowPanel.Width - 40,
+                        Height = 40,
+                        BackColor = Color.FromArgb(25, 25, 35),
+                        Margin = new Padding(5),
+                        Padding = new Padding(10)
+                    };
+
+                    var label = new Label
+                    {
+                        Text = $"{track.Title} — {string.Join(", ", track.Artists)}",
+                        ForeColor = Color.White,
+                        Font = new Font("Segoe UI", 10),
+                        AutoSize = true
+                    };
+
+                    row.Controls.Add(label);
+                    flowPanel.Controls.Add(row);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error cargando canciones: " + ex.Message);
+            }
         }
 
         private void Form1_Load(object sender, EventArgs e)
