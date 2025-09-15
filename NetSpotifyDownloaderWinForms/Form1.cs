@@ -177,7 +177,7 @@ namespace NetSpotifyDownloaderWinForms
                         continue;
                     }
 
-                    var youtubeDownload = await _youtubeDownloaderService.GetMp3DownloadUrlAsync(youtubeTrack.Uri.ToString());
+                    var youtubeDownload = await _youtubeDownloaderService.GetAudioStreamAsync(youtubeTrack.Uri.ToString());
                     if (youtubeDownload == null)
                     {
                         continue;
