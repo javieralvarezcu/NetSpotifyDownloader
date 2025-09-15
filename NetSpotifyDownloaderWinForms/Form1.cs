@@ -157,7 +157,7 @@ namespace NetSpotifyDownloaderWinForms
             foreach (var playlist in playlists)
             {
                 _ = DownloadPlaylistAsync(playlist);
-                Thread.Sleep(5000);
+                Thread.Sleep(9000);
             }
         }
 

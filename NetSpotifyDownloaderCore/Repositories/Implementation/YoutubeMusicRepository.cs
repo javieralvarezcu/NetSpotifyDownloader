@@ -1,6 +1,11 @@
-﻿using Microsoft.Playwright;
+﻿using System;
+using System.Net.Http;
+using System.Threading.Tasks;
 using NetSpotifyDownloaderCore.Model.Spotify.DTOs;
 using NetSpotifyDownloaderCore.Repositories.Interfaces;
+using OpenQA.Selenium;
+using OpenQA.Selenium.Edge;
+using OpenQA.Selenium.Support.UI;
 
 namespace NetSpotifyDownloaderCore.Repositories.Implementation
 {
@@ -13,11 +18,13 @@ namespace NetSpotifyDownloaderCore.Repositories.Implementation
             "--disable-blink-features=AutomationControlled",
             "--disable-infobars",
             "--no-sandbox",
-            "--disable-dev-shm-usage"
+            "--disable-dev-shm-usage",
+            "--headless=new" // Headless en Selenium 4.11+
         };
 
-        private const string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-                                         "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+        private const string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+                                         "AppleWebKit/537.36 (KHTML, like Gecko) " +
+                                         "Edge/122.0.0.0 Safari/537.36";
 
         public YoutubeMusicRepository(HttpClient httpClient)
         {
@@ -26,63 +33,54 @@ namespace NetSpotifyDownloaderCore.Repositories.Implementation
 
         public async Task<YoutubeMusicTrackDTO?> SearchTrackAsync(string title, string artistName)
         {
-            using var playwright = await Playwright.CreateAsync().ConfigureAwait(false);
-            await using var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
-            {
-                Headless = true,
-                Args = BrowserArgs
-            }).ConfigureAwait(false);
+            var options = new EdgeOptions();
+            options.AddArguments(BrowserArgs);
+            options.AddArgument($"--user-agent={UserAgent}");
 
-            var context = await CreateContextAsync(browser).ConfigureAwait(false);
-            var page = await context.NewPageAsync().ConfigureAwait(false);
+            using var driver = new EdgeDriver(options);
+            driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(10);
 
             var query = Uri.EscapeDataString($"{title} {artistName}");
             var searchUrl = $"https://music.youtube.com/search?q={query}";
+            driver.Navigate().GoToUrl(searchUrl);
+            Thread.Sleep(1000);
 
-            await page.GotoAsync(searchUrl, new() { WaitUntil = WaitUntilState.NetworkIdle }).ConfigureAwait(false);
-            await page.EvaluateAsync("() => { Object.defineProperty(navigator, 'webdriver', { get: () => false }); }").ConfigureAwait(false);
+            // Fake webdriver flag
+            ((IJavaScriptExecutor)driver).ExecuteScript("Object.defineProperty(navigator, 'webdriver', { get: () => false });");
+            Thread.Sleep(1000);
 
-            await AcceptConsentIfNeededAsync(page).ConfigureAwait(false);
+            AcceptConsentIfNeeded(driver);
 
-            var trackSection = page
-                .Locator("ytmusic-shelf-renderer:has(h2:has-text('Canciones'))")
-                .First;
+            var bestResultSection = driver.FindElement(By.XPath(
+    "//ytmusic-card-shelf-renderer[.//h2//yt-formatted-string[contains(text(),'Mejor resultado')]]"
+));
 
-            await trackSection.WaitForAsync().ConfigureAwait(false);
+            // Buscar el primer enlace dentro de ese bloque
+            var bestResultLink = bestResultSection.FindElement(
+                By.XPath(".//a[contains(@href,'watch')]")
+            );
 
-            var href = await trackSection
-                .Locator("ytmusic-responsive-list-item-renderer a[href^='watch']")
-                .First
-                .GetAttributeAsync("href").ConfigureAwait(false);
+            var href = bestResultLink.GetAttribute("href");
 
             return href != null
-                ? new YoutubeMusicTrackDTO { Uri = new Uri($"https://music.youtube.com/{href}") }
+                ? new YoutubeMusicTrackDTO { Uri = new Uri(href) }
                 : null;
         }
 
-        private async Task<IBrowserContext> CreateContextAsync(IBrowser browser)
+        private static void AcceptConsentIfNeeded(IWebDriver driver)
         {
-            return await browser.NewContextAsync(new BrowserNewContextOptions
-            {
-                UserAgent = UserAgent,
-                ViewportSize = new ViewportSize { Width = 1280, Height = 720 },
-                Locale = "es-ES",
-                ColorScheme = ColorScheme.Light,
-                JavaScriptEnabled = true
-            }).ConfigureAwait(false);
-        }
-
-        private static async Task AcceptConsentIfNeededAsync(IPage page)
-        {
-            if (!page.Url.Contains("consent.youtube.com"))
+            if (!driver.Url.Contains("consent.youtube.com"))
                 return;
 
             try
             {
-                var acceptButton = page.Locator("button[aria-label='Aceptar todo']").First;
-                await acceptButton.WaitForAsync(new() { Timeout = 5000 }).ConfigureAwait(false);
-                await acceptButton.ClickAsync().ConfigureAwait(false);
-                await page.WaitForURLAsync("**/search**", new() { Timeout = 10000 }).ConfigureAwait(false);
+                var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(5));
+                var acceptButton = wait.Until(drv => drv.FindElement(By.CssSelector("button[aria-label='Aceptar todo']")));
+                acceptButton.Click();
+
+                // Esperar redirección a la búsqueda
+                wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+                wait.Until(drv => drv.Url.Contains("/search"));
             }
             catch
             {

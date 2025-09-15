@@ -1,17 +1,36 @@
 ﻿using NetSpotifyDownloaderCore.Model.Spotify.DTOs;
 using NetSpotifyDownloaderCore.Repositories.Interfaces;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace NetSpotifyDownloaderCore.Repositories.Implementation
 {
     public class YoutubeDownloaderRepository : IYoutubeDownloaderRepository
     {
+        private string GetYtDlpPath()
+        {
+            var basePath = AppContext.BaseDirectory;
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                return Path.Combine(basePath, "Tools", "yt-dlp.exe");
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                return Path.Combine(basePath, "Tools", "yt-dlp_linux");
+
+            //if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            //    return Path.Combine(basePath, "Tools", "yt-dlp_macos");
+
+            throw new PlatformNotSupportedException("Sistema operativo no soportado");
+        }
+
         public async Task<YoutubeDownloadDTO?> GetMp3DownloadUrlAsync(string youtubeUrl)
         {
+            var ytDlpPath = GetYtDlpPath();
+
             var psi = new ProcessStartInfo
             {
-                FileName = "yt-dlp",
-                Arguments = $"--extract-audio --audio-format mp3 -f bestaudio --get-url {youtubeUrl}",
+                FileName = ytDlpPath,
+                Arguments = @$"--extract-audio --audio-format mp3 -f bestaudio --get-url {youtubeUrl}",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -30,12 +49,11 @@ namespace NetSpotifyDownloaderCore.Repositories.Implementation
             if (process.ExitCode != 0)
                 throw new Exception($"yt-dlp error: {error}");
 
-            // Verificamos si la salida contiene una URL válida
             var url = output.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
             if (url != null && Uri.TryCreate(url.Trim(), UriKind.Absolute, out var result))
                 return new()
                 {
-                    Uri = new Uri(result.ToString())
+                    Uri = result
                 };
 
             return null;
