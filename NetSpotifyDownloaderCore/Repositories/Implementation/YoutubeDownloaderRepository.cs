@@ -23,38 +23,28 @@ namespace NetSpotifyDownloaderCore.Repositories.Implementation
             throw new PlatformNotSupportedException("Sistema operativo no soportado");
         }
 
-        public async Task<YoutubeDownloadDTO?> GetMp3DownloadUrlAsync(string youtubeUrl)
+        public async Task<Stream?> GetAudioStreamAsync(string youtubeUrl)
         {
             var ytDlpPath = GetYtDlpPath();
+            var tempFile = Path.GetTempFileName() + ".mp3";
 
             var psi = new ProcessStartInfo
             {
                 FileName = ytDlpPath,
-                Arguments = @$"--extract-audio --audio-format mp3 -f bestaudio --get-url {youtubeUrl}",
-                RedirectStandardOutput = true,
+                Arguments = $"-f bestaudio -x --audio-format mp3 --audio-quality best --embed-metadata --embed-thumbnail -o \"{tempFile}\" {youtubeUrl}",
+                RedirectStandardOutput = false,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
 
-            using var process = Process.Start(psi);
-            if (process == null)
-                throw new InvalidOperationException("No se pudo lanzar yt-dlp");
-
-            var output = await process.StandardOutput.ReadToEndAsync();
-            var error = await process.StandardError.ReadToEndAsync();
-
+            var process = Process.Start(psi)!;
             await process.WaitForExitAsync();
 
-            if (process.ExitCode != 0)
-                throw new Exception($"yt-dlp error: {error}");
-
-            var url = output.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-            if (url != null && Uri.TryCreate(url.Trim(), UriKind.Absolute, out var result))
-                return new()
-                {
-                    Uri = result
-                };
+            if (File.Exists(tempFile))
+            {
+                return new FileStream(tempFile, FileMode.Open, FileAccess.Read, FileShare.Delete, 4096, FileOptions.DeleteOnClose);
+            }
 
             return null;
         }

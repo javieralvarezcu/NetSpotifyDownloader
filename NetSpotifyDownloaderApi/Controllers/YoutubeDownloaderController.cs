@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AngleSharp.Dom;
+using Microsoft.AspNetCore.Mvc;
 using NetSpotifyDownloaderCore.Services;
 
 namespace NetYoutubeDownloaderDownloaderApi.Controllers
@@ -15,10 +16,14 @@ namespace NetYoutubeDownloaderDownloaderApi.Controllers
         }
 
         [HttpGet("download")]
-        public async Task<IActionResult> GetMp3DownloadUrl([FromQuery] string youtubeUrl)
+        public async Task<IActionResult> Download([FromQuery] string youtubeUrl)
         {
-            var youtubeTrack = await _youtubeDownloaderService.GetMp3DownloadUrlAsync(youtubeUrl);
-            return Ok(youtubeTrack);
+            var stream = await _youtubeDownloaderService.GetAudioStreamAsync(youtubeUrl);
+            if (stream == null)
+                return BadRequest("No se pudo obtener el audio");
+
+            // Lo devolvemos como stream HTTP
+            return File(stream, "audio/mp3", "cancion.mp3");
         }
     }
 }

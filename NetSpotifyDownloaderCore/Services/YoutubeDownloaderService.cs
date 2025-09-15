@@ -10,9 +10,9 @@ namespace NetSpotifyDownloaderCore.Services
         {
             _youtubeDownloaderRepository = youtubeDownloaderRepository;
         }
-        public async Task<YoutubeDownloadDTO?> GetMp3DownloadUrlAsync(string youtubeUrl)
+        public async Task<Stream?> GetAudioStreamAsync(string youtubeUrl)
         {
-            return await _youtubeDownloaderRepository.GetMp3DownloadUrlAsync(youtubeUrl);
+            return await _youtubeDownloaderRepository.GetAudioStreamAsync(youtubeUrl);
         }
     }
 }
