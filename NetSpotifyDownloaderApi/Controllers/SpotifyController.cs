@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using NetSpotifyDownloaderCore.Services;
+using NetSpotifyDownloaderDomain.Model.Spotify.DTOs;
 
 namespace NetSpotifyDownloaderApi.Controllers
 {
@@ -17,14 +18,14 @@ namespace NetSpotifyDownloaderApi.Controllers
         [HttpGet("{userId}/playlists")]
         public async Task<IActionResult> GetUserPlaylists(string userId)
         {
-            var playlists = await _spotifyService.GetUserPlaylistsAsync(userId);
+            List<SpotifyPlaylistDTO> playlists = await _spotifyService.GetUserPlaylistsAsync(userId);
             return Ok(playlists);
         }
 
         [HttpGet("{playlistId}/tracks")]
         public async Task<IActionResult> GetTracksByPlaylist(string playlistId)
         {
-            var tracks = await _spotifyService.GetTracksByPlaylistAsync(playlistId);
+            List<SpotifyTrackDTO> tracks = await _spotifyService.GetTracksByPlaylistAsync(playlistId);
             return Ok(tracks);
         }
     }
