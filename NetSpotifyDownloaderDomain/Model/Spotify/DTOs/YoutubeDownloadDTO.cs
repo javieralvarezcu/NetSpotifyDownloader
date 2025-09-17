@@ -1,4 +1,4 @@
-﻿namespace NetSpotifyDownloaderCore.Model.Spotify.DTOs
+﻿namespace NetSpotifyDownloaderDomain.Model.Spotify.DTOs
 {
     public class YoutubeDownloadDTO
     {

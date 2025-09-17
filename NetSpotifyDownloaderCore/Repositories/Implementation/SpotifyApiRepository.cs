@@ -1,9 +1,9 @@
 ﻿using Microsoft.Extensions.Options;
 using NetSpotifyDownloaderCore.Exceptions;
-using NetSpotifyDownloaderCore.Model.Spotify.DTOs;
-using NetSpotifyDownloaderCore.Model.Spotify.Repository;
 using NetSpotifyDownloaderCore.Options;
 using NetSpotifyDownloaderCore.Repositories.Interfaces;
+using NetSpotifyDownloaderDomain.Model.Spotify.DTOs;
+using NetSpotifyDownloaderDomain.Model.Spotify.Repository;
 using System.Text;
 using System.Text.Json;
 

@@ -1,5 +1,4 @@
-﻿using NetSpotifyDownloaderCore.Model.Spotify.DTOs;
-using NetSpotifyDownloaderCore.Repositories.Interfaces;
+﻿using NetSpotifyDownloaderCore.Repositories.Interfaces;
 
 namespace NetSpotifyDownloaderCore.Services
 {

@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Net.Http;
 using System.Threading.Tasks;
-using NetSpotifyDownloaderCore.Model.Spotify.DTOs;
 using NetSpotifyDownloaderCore.Repositories.Interfaces;
+using NetSpotifyDownloaderDomain.Model.Spotify.DTOs;
 using OpenQA.Selenium;
-using OpenQA.Selenium.Edge;
+using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
 
 namespace NetSpotifyDownloaderCore.Repositories.Implementation
@@ -19,12 +19,13 @@ namespace NetSpotifyDownloaderCore.Repositories.Implementation
             "--disable-infobars",
             "--no-sandbox",
             "--disable-dev-shm-usage",
-            "--headless=new" // Headless en Selenium 4.11+
+            "--disable-gpu",
+            "--headless=new"
         };
 
         private const string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
                                          "AppleWebKit/537.36 (KHTML, like Gecko) " +
-                                         "Edge/122.0.0.0 Safari/537.36";
+                                         "Chrome/122.0.0.0 Safari/537.36";
 
         public YoutubeMusicRepository(HttpClient httpClient)
         {
@@ -33,12 +34,13 @@ namespace NetSpotifyDownloaderCore.Repositories.Implementation
 
         public async Task<YoutubeMusicTrackDTO?> SearchTrackAsync(string title, string artistName)
         {
-            var options = new EdgeOptions();
+            var options = new ChromeOptions();
             options.AddArguments(BrowserArgs);
             options.AddArgument($"--user-agent={UserAgent}");
 
-            using var driver = new EdgeDriver(options);
+            using var driver = new ChromeDriver(options);
             driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(10);
+            //driver.Manage().Cookies.AddCookie(new Cookie("CONSENT", "YES+cb"));
 
             var query = Uri.EscapeDataString($"{title} {artistName}");
             var searchUrl = $"https://music.youtube.com/search?q={query}";
@@ -51,20 +53,52 @@ namespace NetSpotifyDownloaderCore.Repositories.Implementation
 
             AcceptConsentIfNeeded(driver);
 
-            var bestResultSection = driver.FindElement(By.XPath(
-    "//ytmusic-card-shelf-renderer[.//h2//yt-formatted-string[contains(text(),'Mejor resultado')]]"
-));
+            var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
 
-            // Buscar el primer enlace dentro de ese bloque
-            var bestResultLink = bestResultSection.FindElement(
-                By.XPath(".//a[contains(@href,'watch')]")
-            );
+            try
+            {
+                // 1. Intentar localizar el bloque "Mejor resultado"
+                var bestResultSection = wait.Until(drv => drv.FindElement(By.XPath(
+                    "//ytmusic-card-shelf-renderer[.//yt-formatted-string[text()='Mejor resultado' or text()='Top result']]"
+                )));
 
-            var href = bestResultLink.GetAttribute("href");
+                // 2. Verificar si el "Mejor resultado" es una canción
+                var subtitle = bestResultSection.FindElement(By.CssSelector(".subtitle")).Text.ToLower();
 
-            return href != null
-                ? new YoutubeMusicTrackDTO { Uri = new Uri(href) }
-                : null;
+                if (subtitle.Contains("canción") || subtitle.Contains("song"))
+                {
+                    // ✅ Es canción → devolvemos ese enlace
+                    var bestResultLink = bestResultSection.FindElement(By.CssSelector("a.yt-simple-endpoint[href*='watch']"));
+                    var href = bestResultLink.GetAttribute("href");
+
+                    return href != null
+                        ? new YoutubeMusicTrackDTO { Uri = new Uri(href) }
+                        : null;
+                }
+            }
+            catch
+            {
+                // Ignoramos y seguimos buscando en "Canciones"
+            }
+
+            try
+            {
+                // 3. Si el "Mejor resultado" no era canción → buscamos en "Canciones"
+                var songsSection = wait.Until(drv => drv.FindElement(By.XPath(
+                    "//ytmusic-shelf-renderer[.//yt-formatted-string[text()='Canciones' or text()='Songs']]"
+                )));
+
+                var firstSongLink = songsSection.FindElement(By.CssSelector("ytmusic-responsive-list-item-renderer a.yt-simple-endpoint[href*='watch']"));
+                var href = firstSongLink.GetAttribute("href");
+
+                return href != null
+                    ? new YoutubeMusicTrackDTO { Uri = new Uri(href) }
+                    : null;
+            }
+            catch
+            {
+                throw new Exception("No se pudo encontrar una canción en los resultados de YouTube Music");
+            }
         }
 
         private static void AcceptConsentIfNeeded(IWebDriver driver)
@@ -75,7 +109,9 @@ namespace NetSpotifyDownloaderCore.Repositories.Implementation
             try
             {
                 var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(5));
-                var acceptButton = wait.Until(drv => drv.FindElement(By.CssSelector("button[aria-label='Aceptar todo']")));
+                var acceptButton = wait.Until(drv =>
+    drv.FindElement(By.XPath("//button[contains(., 'Aceptar')] | //button[contains(., 'Accept all')]"))
+);
                 acceptButton.Click();
 
                 // Esperar redirección a la búsqueda

@@ -17,6 +17,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\NetSpotifyDownloaderDomain\NetSpotifyDownloaderDomain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="Tools\yt-dlp.exe">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

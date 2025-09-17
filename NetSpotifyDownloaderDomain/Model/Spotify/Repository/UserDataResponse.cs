@@ -1,4 +1,4 @@
-﻿namespace NetSpotifyDownloaderCore.Model.Spotify.Repository
+﻿namespace NetSpotifyDownloaderDomain.Model.Spotify.Repository
 {
     public class UserDataResponse
     {

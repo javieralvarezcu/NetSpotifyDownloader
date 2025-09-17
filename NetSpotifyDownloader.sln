@@ -9,6 +9,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetSpotifyDownloaderApi", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetSpotifyDownloaderWinForms", "NetSpotifyDownloaderWinForms\NetSpotifyDownloaderWinForms.csproj", "{50DFA55B-C855-498A-A20D-DAC4C9234EE2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetSpotifyDownloaderConsole", "NetSpotifyDownloaderConsole\NetSpotifyDownloaderConsole.csproj", "{453788E2-1FD7-48AB-9A92-6B13E53392CE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetSpotifyDownloaderDomain", "NetSpotifyDownloaderDomain\NetSpotifyDownloaderDomain.csproj", "{91EC3B0F-53FE-4D9B-971E-E3E4A53054FD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,8 +31,19 @@ Global
 		{50DFA55B-C855-498A-A20D-DAC4C9234EE2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{50DFA55B-C855-498A-A20D-DAC4C9234EE2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{50DFA55B-C855-498A-A20D-DAC4C9234EE2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{453788E2-1FD7-48AB-9A92-6B13E53392CE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{453788E2-1FD7-48AB-9A92-6B13E53392CE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{453788E2-1FD7-48AB-9A92-6B13E53392CE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{453788E2-1FD7-48AB-9A92-6B13E53392CE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{91EC3B0F-53FE-4D9B-971E-E3E4A53054FD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{91EC3B0F-53FE-4D9B-971E-E3E4A53054FD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{91EC3B0F-53FE-4D9B-971E-E3E4A53054FD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{91EC3B0F-53FE-4D9B-971E-E3E4A53054FD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {2BA47E38-7E56-4298-905C-900C091C0745}
 	EndGlobalSection
 EndGlobal

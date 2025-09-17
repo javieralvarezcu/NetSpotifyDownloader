@@ -57,6 +57,12 @@ dlldata.c
 # Benchmark Results
 BenchmarkDotNet.Artifacts/
 
+#Docker Images
+*.tar
+
+#Temp AppSettings for Console Client
+customappsettings.json
+
 # .NET Core
 project.lock.json
 project.fragment.lock.json
