@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using NetSpotifyDownloaderCore.Services;
+using NetSpotifyDownloaderDomain.Model.Spotify.DTOs;
 
 namespace NetSpotifyDownloaderApi.Controllers
 {
@@ -17,7 +18,7 @@ namespace NetSpotifyDownloaderApi.Controllers
         [HttpGet("track")]
         public async Task<IActionResult> GetYoutubeTrack([FromQuery] string title, [FromQuery] string artistName)
         {
-            var youtubeTrack = await _youtubeMusicService.SearchTrackAsync(title, artistName);
+            YoutubeMusicTrackDTO? youtubeTrack = await _youtubeMusicService.SearchTrackAsync(title, artistName);
             return Ok(youtubeTrack);
         }
     }
