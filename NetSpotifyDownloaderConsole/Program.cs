@@ -1,4 +1,5 @@
-﻿using NetSpotifyDownloaderConsole.Utils;
+﻿using NetSpotifyDownloaderConsole.Model;
+using NetSpotifyDownloaderConsole.Utils;
 using NetSpotifyDownloaderDomain.Model.Spotify.DTOs;
 using System.Net.Http.Json;
 
@@ -26,19 +27,55 @@ internal class Program
             switch (option)
             {
                 case "1":
-                    var playlists = await http.GetFromJsonAsync<SpotifyPlaylistDTO[]>(
+                    List<SpotifyPlaylist> playlistsToDownload = new();
+                    SpotifyPlaylist[]? playlists = await http.GetFromJsonAsync<SpotifyPlaylist[]>(
                         $"api/Spotify/{settings.SpotifyClientId}/playlists");
 
-                    if (playlists?.Count() > 0 )
+                    if (playlists?.Count() > 0)
                     {
                         Console.WriteLine("\nPlaylists encontradas:");
-                        foreach (var pl in playlists)
+                        for (int i = 0; i < playlists.Length; i++)
                         {
-                            Console.WriteLine($"- {pl.Name}");
+                            Console.WriteLine($"{i + 1}. {playlists[i].Name}");
 
-                            //var tracks = await http.GetFromJsonAsync<List<SpotifyTrackDTO>>(
-                            //    $"api/Spotify/{pl.Id}/tracks");
                         }
+                        Console.WriteLine("\n\nSelecciona playlists separadas por comas o selecciona todas escribiendo con ENTER:");
+                        string? selectedPlaylistsString = Console.ReadLine();
+                        List<int> selectedPlaylists = new();
+                        if (!string.IsNullOrEmpty(selectedPlaylistsString))
+                        {
+                            selectedPlaylists = selectedPlaylistsString?.Split(',').Select(s => int.Parse(s.Trim()) - 1).ToList();
+                        }
+
+                        if (selectedPlaylists.Count == 0)
+                        {
+                            selectedPlaylists = new();
+                            foreach (SpotifyPlaylist playlist in playlists)
+                            {
+                                selectedPlaylists.Add(playlists.ToList().IndexOf(playlist));
+                            }
+                        }
+
+                        foreach (var playlistIndex in selectedPlaylists)
+                        {
+                            var playlist = playlists[playlistIndex];
+                            Console.WriteLine($"\nObteniendo canciones de {playlist.Name}");
+                            playlists[playlistIndex].SpotifyTracks = await http.GetFromJsonAsync<SpotifyTrack[]>($"api/Spotify/{playlist.Id}/tracks");
+
+                            playlistsToDownload.Add(playlists[playlistIndex]);
+                            //playlistsToDownload.Add(playlist, await http.GetFromJsonAsync<SpotifyTrack[]>($"api/Spotify/{playlist.Id}/tracks"));
+                        }
+
+                        foreach (var playlist in playlistsToDownload)
+                        {
+                            foreach(var song in playlist.SpotifyTracks)
+                            {
+                                Console.WriteLine($"Obteniendo url de youtube de: {song.ArtistsString} - {song.Title}");
+                                var url = $"api/YoutubeMusic/track?title={Uri.EscapeDataString(song.Title)}&artistName={Uri.EscapeDataString(song.ArtistsString)}";
+                                song.YoutubeTrack = await http.GetFromJsonAsync<YoutubeMusicTrack?>(url);
+                            }
+                        }
+
                     }
                     else
                     {
